@@ -18,9 +18,33 @@ type parseGroup struct {
 // an error is returned if the expected list length is greater or less than the resulting list.
 // set expected to -1 to accept any length of list
 func separate(line string, separator string, expected int) (list []string, err error) {
-	//re := regexp.MustCompile("(.*)(?<!(?<!\\)\\)" + separator) // ignores escaped separators and checks for a previously escaped '\'. (does not check for more than 1)
 	re := regexp.MustCompile("(.*)" + separator) // So Go doesn't support negative lookbehinds :/
-	list = re.FindAllString(line, -1)
+	// the [][]int type returned by FindAllStringIndex is unused and results in less readable code, so fixing it now.
+	var ilist []int
+	for _, i := range re.FindAllStringIndex(line, -1) {
+		ilist = append(ilist, i[0])
+	}
+	// checking if characters are escaped
+	for li, index := range ilist {
+		count := 0
+		for {
+			if line[index-1-count] == '\\' { // if previous character is a '\\', incresase count
+				count++
+			} else {
+				break
+			}
+		}
+		if count%2 == 1 {
+			ilist = append(ilist[:li], ilist[li+1:]...)
+		}
+	}
+	// setting list based on indexes supplied from ilist
+	if len(ilist) > 0 {
+		list = append(list, line[:ilist[0]])
+		for i := 0; i < len(ilist)-1; i++ {
+			list = append(list, line[ilist[i]:ilist[i+1]])
+		}
+	}
 	if expected == -1 || len(list) == expected {
 		return
 	}
