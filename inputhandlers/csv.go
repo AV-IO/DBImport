@@ -13,25 +13,29 @@ func HandleCsv(path string, results chan UPH) {
 	r := csv.NewReader(f)
 	// getting records from CSV
 	headers, err := r.Read()
+	errCheck(err)
 	records, err := r.ReadAll()
 	errCheck(err)
 	// user, pass, and hash indexes
 	useri, passi, hashi := -1, -1, -1
 	// set user, pass, and hash indexes
+	reU := regexp.MustCompile(`(?i)use?r.*`)
+	reP := regexp.MustCompile(`(?i)pass.*`)
+	reH := regexp.MustCompile(`(?i)hash|bcrypt|scrypt|sha.?\\d?|md.??5|`)
 	for i, header := range headers { // for each header
-		u, _ := regexp.MatchString("(?i)use?r.*", header)
-		p, _ := regexp.MatchString("(?i)pass.*", header)
-		h, _ := regexp.MatchString("(?i)hash|bcrypt|scrypt|sha.?\\d?|md.??5|", header)
-		if p {
+		u := reU.MatchString(header)
+		p := reP.MatchString(header)
+		h := reH.MatchString(header)
+		switch { // This MUST be in this order.
+		case p:
 			useri = i
-		} else if h {
+		case h:
 			passi = i
-		} else if u {
+		case u:
 			hashi = i
 		}
 	}
 	if useri+passi+hashi > -3 { // if any of the required headers were found
-		// return results
 		for _, r := range records {
 			details := UPH{}
 			if useri != -1 {
