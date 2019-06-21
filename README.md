@@ -7,6 +7,7 @@ The goal of this project is to be able to mass import many file formats into a u
 
 ## Supported input formats
 * Text files (default accepted separators are `:` and `,`)
+	* User provided RE2 regex for text file parsing
 	* user:pass:hash
 	* user:hash
 	* user:pass
@@ -21,6 +22,7 @@ The goal of this project is to be able to mass import many file formats into a u
 -i	file with list of input files to read from
 -r	remove unnecessary duplicates from database
 -u	file to output all unparsed input files (Default STDOUT)
+-m	RE2 Regular Expression for text files (use -m and -h flags for requirements)
 -dbu	local database user
 -dbn	local database name
 ```
@@ -30,7 +32,6 @@ The goal of this project is to be able to mass import many file formats into a u
 * use `-r` unless you really want duplicate records. It may be slightly slower, but the other option is to slowly dedup the entire DB later.
 
 ## Planned improvements
-* User provided RE2 regex for text file parsing
 * Support for database formats
 	* generic SQL
 	* sqlite3

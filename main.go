@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -126,7 +127,7 @@ func listFromFile(file string) (list []string) {
 }
 
 // handleFiles handles the processing of all file types
-func handleFiles(input, unreadPath string, isRootPath, rDups bool, db *sql.DB) {
+func handleFiles(input, unreadPath, userMatch string, isRootPath, rDups bool, db *sql.DB) {
 	var files, ignoredFiles []string
 	if isRootPath {
 		err := filepath.Walk(input, func(path string, info os.FileInfo, err error) error {
@@ -148,7 +149,7 @@ func handleFiles(input, unreadPath string, isRootPath, rDups bool, db *sql.DB) {
 	for _, file := range files {
 		switch filepath.Ext(file) {
 		case "txt", "": // lazily assuming no file extension means plain text
-			go ih.HandleTxt(file, results)
+			go ih.HandleTxt(file, userMatch, results)
 		case "csv":
 			go ih.HandleCsv(file, results)
 		case "db", "sql", "mysql", "sqlite3":
@@ -170,32 +171,78 @@ func handleFiles(input, unreadPath string, isRootPath, rDups bool, db *sql.DB) {
 	printList(unreadPath, ignoredFiles)
 }
 
+func flagCheck(name string) bool {
+	found := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
 func main() {
 	// Flag handling
+	help := flag.Bool("h", false, "show more help about a flag")
+
 	rPath := flag.String("p", "", "root path for recursive file import")
 	fList := flag.String("i", "", "file with list of input files to read from")
-	rDups := flag.Bool("r", false, "remove unnecessary duplicates from database")
 	unreadPath := flag.String("u", "", "file to output all unparsed input files (Default STDOUT)")
+
+	userMatch := flag.String("m", "", "RE2 Regular Expression for text files (use -m and -h flags for requirements)")
+
+	rDups := flag.Bool("r", false, "remove unnecessary duplicates from database")
 	dbUser := flag.String("dbu", "", "local database user")
-	dbName := flag.String("dbn", "", "local database name")
-	if *rPath == "" && *fList == "" {
-		fmt.Println("Please specify a path")
-		flag.PrintDefaults()
+	dbName := flag.String("dbn", "default", "local database name")
+
+	flag.Parse()
+	mIsSet := flagCheck("m")
+
+	// Checking if extra help is needed
+	if *help {
+		switch {
+		case mIsSet:
+			fmt.Println(
+				"Regular expression is in the RE2 format and can be written in two forms:\n",
+				"\tExtracting a precise format: 'user:pass:hash'\n",
+				"\tExtracting individual groups: '(user)|(pass)|(hash)'\n",
+				"Both methods require that named capture groups are used. These names must be the following:\n",
+				"\tusername/email: (?P<username>)\n",
+				"\tpassword: (?P<password>)\n",
+				"\thash: (?P<hash>)",
+			)
+		default:
+			flag.PrintDefaults()
+		}
 		return
 	}
-	if *dbName == "" {
-		*dbName = "default"
+	canRun := true
+	var input string // either rPath or fList
+	if *rPath != "" {
+		input = *rPath
+	} else {
+		if *fList != "" {
+			input = *fList
+		} else {
+			fmt.Println("Please specify a path")
+			flag.PrintDefaults()
+			canRun = false
+		}
 	}
-	if *dbUser == "" || *dbName == "" {
-		fmt.Println("Please enter all requrired database information")
+	if *dbUser == "" {
+		fmt.Println("Please enter a database Username")
 		flag.PrintDefaults()
+		canRun = false
+	}
+	if _, err := regexp.Compile(*userMatch); mIsSet && err != nil {
+		fmt.Println("Regular Expression cannot be compiled. Please ensure correct syntax is being used.")
+		canRun = false
+	}
+	if !canRun {
 		return
 	}
+
 	db := dbSetup(*dbUser, *dbName)
 	// process files
-	if *rPath == "" {
-		handleFiles(*rPath, *unreadPath, true, *rDups, db)
-	} else {
-		handleFiles(*fList, *unreadPath, false, *rDups, db)
-	}
+	handleFiles(input, *unreadPath, *userMatch, true, *rDups, db)
 }
