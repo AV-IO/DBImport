@@ -47,22 +47,9 @@ func separate(line, separator string, expected int) (list []string, err error) {
 	return
 }
 
-func namedMatchtoMap(re *regexp.Regexp, line string) (matchMap map[string]string) {
-	matchMap = make(map[string]string)
-	matches := re.FindAllStringSubmatch(line, -1)
-	for i := range matches {
-		for j, name := range re.SubexpNames() {
-			if j != 0 && name != "" && matches[i][j] != "" && matchMap[name] == "" {
-				matchMap[name] = matches[i][j]
-			}
-		}
-	}
-	return matchMap
-}
-
 func checkUserMatch(userMatch string, lines []string, userPG parseGroup) bool {
 	for _, l := range lines {
-		if len(namedMatchtoMap(userPG.re, l)) > 0 {
+		if len(namedMatchtoStringMap(userPG.re, l)) > 0 {
 			userPG.count++
 		}
 	}
@@ -161,7 +148,7 @@ func HandleTxt(path, userMatch string, results chan UPH) {
 		userPG := parseGroup{
 			re: userRE,
 			handler: func(line, separator string) UPH {
-				matchMap := namedMatchtoMap(userRE, line)
+				matchMap := namedMatchtoStringMap(userRE, line)
 				return UPH{User: matchMap["username"], Pass: matchMap["password"], Hash: matchMap["hash"]}
 			},
 		}

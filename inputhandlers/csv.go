@@ -3,7 +3,6 @@ package inputhandlers
 import (
 	"encoding/csv"
 	"os"
-	"regexp"
 )
 
 // HandleCsv handles the parsing of CSV files
@@ -16,36 +15,26 @@ func HandleCsv(path string, results chan UPH) {
 	errCheck(err)
 	records, err := r.ReadAll()
 	errCheck(err)
-	// user, pass, and hash indexes
-	useri, passi, hashi := -1, -1, -1
 	// set user, pass, and hash indexes
-	reU := regexp.MustCompile(`(?i)use?r.*`)
-	reP := regexp.MustCompile(`(?i)pass.*`)
-	reH := regexp.MustCompile(`(?i)hash|bcrypt|scrypt|sha.?\\d?|md.??5|`)
-	for i, header := range headers { // for each header
-		u := reU.MatchString(header)
-		p := reP.MatchString(header)
-		h := reH.MatchString(header)
-		switch { // This MUST be in this order.
-		case p:
-			useri = i
-		case h:
-			passi = i
-		case u:
-			hashi = i
+	im := standardMatchtoIndexMap(headers)
+	doContinue := false
+	for _, v := range im {
+		if v != -1 {
+			doContinue = true
+			break
 		}
 	}
-	if useri+passi+hashi > -3 { // if any of the required headers were found
+	if doContinue { // if any of the required headers were found
 		for _, r := range records {
 			details := UPH{}
-			if useri != -1 {
-				details.User = r[useri]
+			if im["username"] != -1 {
+				details.User = r[im["username"]]
 			}
-			if passi != -1 {
-				details.Pass = r[passi]
+			if im["password"] != -1 {
+				details.Pass = r[im["password"]]
 			}
-			if hashi != -1 {
-				details.Hash = r[hashi]
+			if im["hash"] != -1 {
+				details.Hash = r[im["hash"]]
 			}
 			results <- details
 		}
